@@ -1,0 +1,354 @@
+modules:
+  rovo:agent:
+    - key: vigil-agent
+      name: Vigil
+      description: Reporting clocks for medical device complaints, under FDA 21 CFR Part 803 and the EU MDR.
+      prompt: >
+        You are Vigil. You help complaint handling and regulatory teams at medical device manufacturers work out
+        whether a complaint must be reported to FDA (21 CFR Part 803) or to EU competent authorities (MDR Article 87),
+        and by when. You do not decide medical or legal facts yourself. You find the facts in the complaint record,
+        quote them, and ask a person to confirm. Vigil's code computes every deadline from the confirmed facts.
+
+
+        How to assess a complaint:
+
+        1. Call get-complaint. It returns the description and every comment with its date (read through Teamwork
+        Graph), the criteria to answer, and the current clocks.
+
+        2. Call get-risk-file. It returns the product's risk management file and the pages it links to, such as the
+        hazard analysis and the post-market surveillance plan.
+
+        3. Propose the awareness date (day 0): the earliest date on which any employee or representative of the
+        manufacturer (for example a sales representative or a field engineer) received information about the event,
+        even if the complaint was created later. Quote the sentence that shows it. If the record states no earlier
+        date, use the date the complaint was created and say so.
+
+        4. Answer each criterion yes, no or unknown, with a short quote as evidence. Answer unknown when the record
+        does not say. Definitions:
+        seriousInjury: life-threatening, permanent impairment or damage, or needing medical or surgical intervention
+        to prevent permanent impairment (21 CFR 803.3); in the EU, a serious deterioration of health.
+        couldCauseSeriousInjury: if the malfunction happened again, it would be likely to cause or contribute to a
+        death or serious injury.
+        unanticipated: answer no only if the hazard analysis from get-risk-file lists this harm for this situation,
+        and name the hazard ID; answer yes if it does not; answer unknown if no risk file is available.
+        remedialAction: the event shows that remedial action, such as a correction or recall, is needed to prevent
+        an unreasonable risk of substantial harm to the public health.
+        expectedSideEffect: yes only if the technical documentation documents and quantifies it as an expected
+        side-effect.
+        causality: established, possible, excluded or unknown.
+
+        5. Show the proposed day 0 and the answers as a short list and ask the user to confirm or correct them.
+        Record nothing before the user confirms.
+
+        6. Call record-assessment with the confirmed answers as key=value pairs separated by semicolons (for
+        example "death=no; seriousInjury=yes; causality=possible"), the evidence as one line per criterion (for
+        example "seriousInjury: the patient needed surgery"), and a rationale of one or two sentences.
+
+        7. Report the clocks that record-assessment returns: for each regulator, the report, the due date, the days
+        left and the rule, using the reason text it returns. Add nothing about the rules that the reason text does
+        not say.
+
+        8. Offer to write a decision record page with write-decision-record.
+
+
+        Other tasks:
+
+        - "What is due?": call list-due and start with overdue and due-soon items.
+
+        - "Any trends?": call trend-check. Give the count, the expected count from the surveillance plan and the
+        p-value. A signal is a prompt to review for a trend report (MDR Article 88), not a decision.
+
+        - When the user says a report was sent, call record-submission with the regulator (FDA, FDA-SUPP, FDA-5 or
+        EU), the date and the reference. When new information arrives after an FDA report, call record-submission
+        with newInfoDate.
+
+
+        Rules: use only facts returned by the actions. Never invent dates, quotes, hazard IDs or report numbers.
+        Vigil does not submit reports to any authority and does not replace the complaint handling procedure. Write
+        dates as "17 Nov 2026". Keep answers short.
+      conversationStarters:
+        - Assess this complaint for reportability
+        - Which reports are due in the next 7 days?
+        - Are there any trend signals?
+      actions:
+        - get-complaint
+        - get-risk-file
+        - record-assessment
+        - record-submission
+        - list-due
+        - trend-check
+        - write-decision-record
+  action:
+    - key: get-complaint
+      name: Get complaint facts
+      function: fn-get-complaint
+      actionVerb: GET
+      description: >
+        Returns a medical device complaint's description and every comment with its date (from Teamwork Graph), the
+        reporting criteria to answer, any saved assessment, and the current reporting clocks.
+      inputs:
+        complaintKey:
+          title: Complaint key
+          type: string
+          required: false
+          description: "Optional Jira work item key, for example CMP-1. Leave empty for the current work item."
+    - key: get-risk-file
+      name: Get risk management file
+      function: fn-get-risk-file
+      actionVerb: GET
+      description: >
+        Returns the product's risk management file and the pages it links to (found through Teamwork Graph), such as
+        the hazard analysis and the post-market surveillance plan, with their text and owners.
+      inputs:
+        complaintKey:
+          title: Complaint key
+          type: string
+          required: false
+          description: "Optional Jira work item key, for example CMP-1. Leave empty for the current work item."
+        productKey:
+          title: Product key
+          type: string
+          required: false
+          description: "Optional product key, for example FB-20, instead of a complaint."
+    - key: record-assessment
+      name: Record reportability assessment
+      function: fn-record-assessment
+      actionVerb: CREATE
+      description: >
+        Saves the confirmed facts of a complaint (awareness date, reporting criteria, causality, evidence and
+        rationale) and returns the FDA and EU reporting clocks computed from them.
+      inputs:
+        complaintKey:
+          title: Complaint key
+          type: string
+          required: false
+          description: "Jira work item key, for example CMP-1. Leave empty for the current work item."
+        awarenessDate:
+          title: Awareness date (day 0)
+          type: string
+          required: true
+          description: "YYYY-MM-DD: the earliest date any employee or representative received information about the event."
+        awarenessQuote:
+          title: Awareness evidence
+          type: string
+          required: false
+          description: "The sentence that shows the awareness date."
+        answers:
+          title: Answers
+          type: string
+          required: true
+          description: >
+            Each criterion as key=value, separated by semicolons. Keys: death, seriousInjury, malfunction,
+            couldCauseSeriousInjury, publicHealthThreat, unanticipated, remedialAction, fdaRequest, expectedSideEffect
+            (each yes, no or unknown) and causality (established, possible, excluded or unknown). Example:
+            death=no; seriousInjury=yes; malfunction=yes; couldCauseSeriousInjury=yes; publicHealthThreat=no;
+            unanticipated=no; remedialAction=no; fdaRequest=no; expectedSideEffect=no; causality=possible
+        remedialDate:
+          title: Remedial action date
+          type: string
+          required: false
+          description: "Optional YYYY-MM-DD: when the need for remedial action became known, if later than day 0."
+        reportabilityDate:
+          title: Reportability date
+          type: string
+          required: false
+          description: "Optional YYYY-MM-DD: when new information made a complaint first judged not reportable reportable."
+        evidence:
+          title: Evidence
+          type: string
+          required: false
+          description: "One line per criterion with a short quote, for example: seriousInjury: the patient needed surgery"
+        rationale:
+          title: Rationale
+          type: string
+          required: false
+          description: "One or two sentences explaining the decision."
+    - key: record-submission
+      name: Record a report sent
+      function: fn-record-submission
+      actionVerb: UPDATE
+      description: >
+        Records that a report was sent to a regulator (with date and reference), or the date new information arrived
+        after the FDA report, and returns the updated clocks.
+      inputs:
+        complaintKey:
+          title: Complaint key
+          type: string
+          required: false
+          description: "Jira work item key, for example CMP-1. Leave empty for the current work item."
+        regulator:
+          title: Report
+          type: string
+          required: false
+          description: "FDA, FDA-SUPP (supplemental), FDA-5 (separate 5-day report) or EU"
+        submittedOn:
+          title: Date sent
+          type: string
+          required: false
+          description: "YYYY-MM-DD. Defaults to today."
+        reference:
+          title: Reference
+          type: string
+          required: false
+          description: "The report number or reference."
+        newInfoDate:
+          title: New information date
+          type: string
+          required: false
+          description: "YYYY-MM-DD: when new information arrived after the FDA report."
+    - key: list-due
+      name: List reports due
+      function: fn-list-due
+      actionVerb: GET
+      description: Returns reports due within a number of days or overdue, and complaints that still need an assessment, most urgent first.
+      inputs:
+        withinDays:
+          title: Within days
+          type: integer
+          required: false
+          description: "Optional, default 14."
+    - key: trend-check
+      name: Check trends
+      function: fn-trend-check
+      actionVerb: GET
+      description: >
+        Returns, for each problem code, the non-serious incidents in the surveillance plan's window, the expected
+        count, a one-sided Poisson test and whether it is a trend signal (MDR Article 88).
+      inputs:
+        productKey:
+          title: Product key
+          type: string
+          required: false
+          description: "Optional product key, for example FB-20."
+    - key: write-decision-record
+      name: Write decision record
+      function: fn-decision-record
+      actionVerb: CREATE
+      description: Writes a Confluence page in the product's quality space with the complaint's facts, evidence, clocks and rationale.
+      inputs:
+        complaintKey:
+          title: Complaint key
+          type: string
+          required: false
+          description: "Jira work item key, for example CMP-1. Leave empty for the current work item."
+  jira:issuePanel:
+    - key: reporting-clocks-panel
+      resource: panel-ui
+      resolver:
+        function: fn-resolver
+      render: native
+      title: Reporting clocks
+      icon: https://developer.atlassian.com/platform/forge/images/icons/issue-panel-icon.svg
+  jira:globalPage:
+    - key: vigilance-page
+      resource: dashboard-ui
+      resolver:
+        function: fn-resolver
+      render: native
+      title: Vigilance
+  trigger:
+    - key: complaint-events
+      function: fn-complaint-event
+      events:
+        - avi:jira:commented:issue
+        - avi:jira:updated:issue
+      filter:
+        ignoreSelf: true
+  scheduledTrigger:
+    - key: daily-sweep
+      function: fn-daily-sweep
+      interval: day
+  function:
+    - key: fn-resolver
+      handler: index.handler
+    - key: fn-get-complaint
+      handler: index.actionGetComplaint
+    - key: fn-get-risk-file
+      handler: index.actionGetRiskFile
+    - key: fn-record-assessment
+      handler: index.actionRecordAssessment
+    - key: fn-record-submission
+      handler: index.actionRecordSubmission
+    - key: fn-list-due
+      handler: index.actionListDue
+    - key: fn-trend-check
+      handler: index.actionTrendCheck
+    - key: fn-decision-record
+      handler: index.actionWriteDecisionRecord
+    - key: fn-complaint-event
+      handler: index.onComplaintEvent
+    - key: fn-daily-sweep
+      handler: index.dailySweep
+resources:
+  - key: panel-ui
+    path: src/frontend/panel.jsx
+  - key: dashboard-ui
+    path: src/frontend/dashboard.jsx
+permissions:
+  scopes:
+    - read:jira-work
+    - write:jira-work
+    - read:page:confluence
+    - write:page:confluence
+    - read:space:confluence
+    - storage:app
+    - read:graph:issue:jira
+    - read:graph:issue-comment:jira
+    - read:graph:page:confluence
+    - read:graph:user:atlassian
+app:
+  runtime:
+    name: nodejs24.x
+    memoryMB: 256
+    architecture: arm64
+  id: ari:cloud:ecosystem::app/REPLACE_AT_SYNC
+  compatibility:
+    jira:
+      required: true
+    confluence:
+      required: false
+  storage:
+    entities:
+      - name: assessment
+        attributes:
+          complaintKey:
+            type: string
+          productKey:
+            type: string
+          awarenessDate:
+            type: string
+          awarenessQuote:
+            type: string
+          reportabilityDate:
+            type: string
+          remedialDate:
+            type: string
+          newInfoDate:
+            type: string
+          criteria:
+            type: any
+          evidence:
+            type: any
+          rationale:
+            type: string
+          submissions:
+            type: any
+          lifecycle:
+            type: string
+          nextDue:
+            type: string
+          decisionPageId:
+            type: string
+          decisionPageUrl:
+            type: string
+          createdAt:
+            type: string
+          updatedAt:
+            type: string
+        indexes:
+          - productKey
+          - name: lifecycle-due
+            partition:
+              - lifecycle
+            range:
+              - nextDue

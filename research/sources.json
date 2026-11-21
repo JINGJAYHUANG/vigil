@@ -1,0 +1,32 @@
+{
+  "accessed": "2026-11-13 ET",
+  "sources": [
+    {
+      "what": "21 CFR Part 803 (Medical Device Reporting), eCFR point-in-time 2026-11-01",
+      "url": "https://www.ecfr.gov/api/versioner/v1/full/2026-11-01/title-21.xml?part=803",
+      "saved_as": "ecfr-21cfr803-2026-11-01.txt",
+      "sha256": "8e2dc28af2100b0a6d613f6c311a5ba5eeebfe7eecb4cad1f1c619657e50cf84"
+    },
+    {
+      "what": "Regulation (EU) 2017/745 (MDR), EUR-Lex HTML, read in the built-in browser (curl gets a bot check)",
+      "url": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:32017R0745",
+      "sections_read": [
+        "Art. 2(64)-(68)",
+        "Art. 87(1)-(9)",
+        "Art. 88(1)"
+      ]
+    },
+    {
+      "what": "OPM federal holiday schedules 2026 and 2027 (observed dates)",
+      "url": "https://www.opm.gov/policy-data-oversight/pay-leave/federal-holidays/"
+    },
+    {
+      "what": "Teamwork Graph curated queries, scopes, limitations; Forge 'Call the Teamwork Graph API'",
+      "url": "https://developer.atlassian.com/platform/teamwork-graph/curated-queries/"
+    },
+    {
+      "what": "Codegeist 2026 rules: categories, bonus prizes, multiple submissions, judging criteria",
+      "url": "https://codegeist2026.devpost.com/rules"
+    }
+  ]
+}

@@ -1,0 +1,4 @@
+node_modules/
+.app-id
+*.log
+.DS_Store
